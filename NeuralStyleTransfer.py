@@ -148,9 +148,6 @@ def load_network():
         vgg = vgg.half()
     return vgg
 
-def backwards_debug_hook(grad):
-    print("Uh oh, master_params is receiving a gradient in the backward pass!")
-
 # Run style transfer, complete with pre- and post- processing
 def style(model, style_image, content_image, iterations):                    
     n_iter=[0]
@@ -162,10 +159,8 @@ def style(model, style_image, content_image, iterations):
     if args.half:
         master_params = Variable(content_image.data.float(), requires_grad = True)
         master_params.grad = master_params.new(*master_params.size())
-        master_params.register_hook(backwards_debug_hook)
     else:
         master_params = content_image
-    # quit()
     
     if  args.optimizer.lower() == 'adam':
         optimizer = optim.Adam([master_params], lr=args.lr, eps=args.eps, betas=(args.beta1, 0.999))
@@ -191,13 +186,12 @@ def style(model, style_image, content_image, iterations):
         if args.half:
             master_params.grad.data.copy_(content_image.grad.data)
 
-        # print(master_params.grad.data)
-        # quit()
         n_iter[0]+=1
         if n_iter[0]%args.log_interval == 1:
             print('Iteration: %d, loss: %d time : %s'%(n_iter[0], int(loss.data[0]), time.time()-t0))
 #            print([loss_layers[li] + ': ' +  str(l.data[0]) for li,l in enumerate(layer_losses)]) #loss of each layer
         return loss
+
     while n_iter[0] <= iterations:
         optimizer.step(closure)
         if args.save_interval > 0 and n_iter[0]%args.save_interval == 0 and n_iter[0] > 0:
