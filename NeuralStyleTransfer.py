@@ -148,6 +148,9 @@ def load_network():
         vgg = vgg.half()
     return vgg
 
+def backwards_debug_hook(grad):
+    print("Uh oh, master_params is receiving a gradient in the backward pass!")
+
 # Run style transfer, complete with pre- and post- processing
 def style(model, style_image, content_image, iterations):                    
     n_iter=[0]
@@ -155,22 +158,41 @@ def style(model, style_image, content_image, iterations):
     style_image = prep(style_image)
     content_image = prep(content_image)
     targets = compute_targets(model, style_image,  content_image)    
+
+    if args.half:
+        master_params = Variable(content_image.data.float(), requires_grad = True)
+        master_params.grad = master_params.new(*master_params.size())
+        master_params.register_hook(backwards_debug_hook)
+    else:
+        master_params = content_image
+    # quit()
     
     if  args.optimizer.lower() == 'adam':
-        optimizer = optim.Adam([content_image], lr=args.lr, eps=args.eps, betas=(args.beta1, 0.999))
+        optimizer = optim.Adam([master_params], lr=args.lr, eps=args.eps, betas=(args.beta1, 0.999))
     elif args.optimizer .lower()== 'sgd':
-        optimizer = torch.optim.SGD([content_image], lr=args.lr, momentum=0.99999)
+        optimizer = torch.optim.SGD([master_params], lr=args.lr, momentum=0.99999)
     else:
-        optimizer = optim.LBFGS([content_image], args.lr)
+        optimizer = optim.LBFGS([master_params], args.lr)
 
     loss_layers = model.style_layers + model.content_layers
     
     def closure():
-        optimizer.zero_grad()
+        if content_image.grad is not None:
+            content_image.grad.zero_()
+
+        if args.half:
+            content_image.data.copy_(master_params.data)
+
         out = model(content_image, loss_layers)
         layer_losses = [weights[a] * loss_fns[a](A.float(), targets[a]) for a,A in enumerate(out)]
         loss = sum(layer_losses)
         loss.backward()
+        
+        if args.half:
+            master_params.grad.data.copy_(content_image.grad.data)
+
+        # print(master_params.grad.data)
+        # quit()
         n_iter[0]+=1
         if n_iter[0]%args.log_interval == 1:
             print('Iteration: %d, loss: %d time : %s'%(n_iter[0], int(loss.data[0]), time.time()-t0))
