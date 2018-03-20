@@ -7,7 +7,8 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 
-from apex.utils import FP16_Optimizer
+# from apex.utils import FP16_Optimizer
+from fp16_optimizer import FP16_Optimizer
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
