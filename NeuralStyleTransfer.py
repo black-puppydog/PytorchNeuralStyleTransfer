@@ -7,7 +7,7 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 
-from fp16_optimizer import FP16_Optimizer
+from apex.utils import FP16_Optimizer
 
 torch.backends.cudnn.enabled = True
 torch.backends.cudnn.benchmark = True
@@ -171,8 +171,8 @@ def style(model, style_image, content_image, iterations):
 
     if args.half:
         optimizer = FP16_Optimizer(optimizer, 
-                                   scale=args.static_loss_scale, 
-                                   dynamic_scale=args.dynamic_loss_scale)
+                                   static_loss_scale=args.static_loss_scale, 
+                                   dynamic_loss_scale=args.dynamic_loss_scale)
 
     loss_layers = model.style_layers + model.content_layers
     
@@ -186,10 +186,6 @@ def style(model, style_image, content_image, iterations):
             optimizer.backward(loss)
         else:
             loss.backward()
-
-        # print(content_image.grad.data)
-        # print(optimizer.fp32_params[0].grad.data)
-        # quit()
 
         n_iter[0]+=1
         if n_iter[0]%args.log_interval == 1:
